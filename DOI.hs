@@ -25,6 +25,7 @@ import           Safe
 import           System.Console.Haskeline
 import           System.Directory
 import           System.Environment
+import           System.Environment.Blank (getEnvDefault)
 import           System.Exit
 import           System.FilePath
 import           System.IO
@@ -49,7 +50,7 @@ dstVar = "BIBDIR"
 pdfSubDir = "doi"
 -- ^ subdirectory for PDFs
 
-bibFileName = "literatur.bib"
+defaultBibFileName = "db.bib"
 -- ^ BibTeX entries are appended to this file 
 
 -- | Url of the bibsonomy scraper (e.g. their public version of self hosted)
@@ -124,7 +125,7 @@ safeGetEnv name = catch (getEnv name) error
 --              or value for the 'file' field
 action (Options raw path key) = do
   dst <- safeGetEnv dstVar
-  let bibFile = dst </> bibFileName
+  bibFile <- getEnvDefault "BIBFILE" $ dst </> defaultBibFileName
   existingKey bibFile key
   let edoi = extractDoi raw
       url = maybe raw doiUrl edoi
