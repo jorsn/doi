@@ -42,13 +42,14 @@ import           Text.Regex.Base.RegexLike
 import           Text.Regex.TDFA
 
 -- * hard coded global config (bad)
-dst = "/home/data/promotion/Literatur"
--- ^ destination folder
+
+dstVar = "BIBDIR"
+-- ^ env var specifying destination folder
 
 pdfSubDir = "doi"
 -- ^ subdirectory for PDFs
 
-bibFile = dst </> "literatur.bib"           
+bibFileName = "literatur.bib"
 -- ^ BibTeX entries are appended to this file 
 
 -- | Url of the bibsonomy scraper (e.g. their public version of self hosted)
@@ -109,15 +110,22 @@ doiFromBibsonomy b =  f $ find ((=="doi") . fmap toLower . fst) =<< fmap fields 
   where f = fromMaybe (error $ printf "Bibsonomy returned no DOI:\n%s\n" $ maybe "" entry b)
             . (extractDoi . snd =<<)
                     
-existingKey Nothing = return ()
-existingKey (Just key) = (isInfixOf key <$> readFile bibFile) >>= flip when
+existingKey _ Nothing = return ()
+existingKey bibFile (Just key) = (isInfixOf key <$> readFile bibFile) >>= flip when
                          (printf "Key '%s' already present in '%s'\n" key bibFile >> exitFailure)
+
+safeGetEnv :: String -> IO String
+safeGetEnv name = catch (getEnv name) error
+  where error :: IOException -> IO String
+        error _ = printf "Environment variable '%s' (destination folder) is not set\n" name >> exitFailure
 
 -- | first arg: doi or url
 --  second arg: filename for preexisting file (which will be moved to doi location)
 --              or value for the 'file' field
 action (Options raw path key) = do
-  existingKey key
+  dst <- safeGetEnv dstVar
+  let bibFile = dst </> bibFileName
+  existingKey bibFile key
   let edoi = extractDoi raw
       url = maybe raw doiUrl edoi
   bibson <- async $ downloadBibTeX url bibsonomy
@@ -127,7 +135,7 @@ action (Options raw path key) = do
   bibs <- (fmap catMaybes . mapM wait . (bibson:)) =<<
           mapM (async . downloadBibTeX (doiUrl doi)) [crossref2]
   -- crossref not as up-to-date e.g. for SSRN
-  file <- maybeToList . fmap ((,) "file") <$> getFile doi path
+  file <- maybeToList . fmap ((,) "file") <$> getFile dst doi path
   timestamp <- formatTime defaultTimeLocale "%FT%T" <$> getZonedTime
   let mod bib = bib { fields =
                           fields bib ++ file ++ [("timestamp",timestamp)]
@@ -149,12 +157,13 @@ normalizeDoi (f,v) = (,) f $
                      else v
 
 getFile :: String -- ^ DOI
+        -> FilePath -- ^ destination folder
         -> Maybe String -- ^ Existing File if available
         -> IO (Maybe FilePath)
-getFile doi f = do e <- doesFileExist target
-                   if e then do pErr "File already exists: %s" target
-                                return $ Just filename
-                     else g f 
+getFile dst doi f = do e <- doesFileExist target
+                       if e then do pErr "File already exists: %s" target
+                                    return $ Just filename
+                         else g f 
   where g (Just f) = do
           e <- doesFileExist f
           if e then withTarget (fmap Just . copyFile f)
