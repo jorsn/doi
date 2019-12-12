@@ -42,7 +42,7 @@ import           Text.Regex
 import           Text.Regex.Base.RegexLike
 import           Text.Regex.TDFA
 
--- * hard coded global config (bad)
+-- * configuration
 
 dstVar = "BIBDIR"
 -- ^ env var specifying destination folder
