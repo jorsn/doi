@@ -44,14 +44,17 @@ import           Text.Regex.TDFA
 
 -- * configuration
 
-dstVar = "BIBDIR"
+dstEnv = "BIBDIR"
 -- ^ env var specifying destination folder
 
 pdfSubDir = "doi"
 -- ^ subdirectory for PDFs
 
-defaultBibFileName = "db.bib"
--- ^ BibTeX entries are appended to this file 
+bibFileEnv = "BIBFILE"
+-- ^ env var: BibTeX entries are appended to this file 
+
+defaultBibFileEnv = "db.bib"
+-- ^ default for `bibFileEnv`
 
 -- | Url of the bibsonomy scraper (e.g. their public version of self hosted)
 --
@@ -124,8 +127,8 @@ safeGetEnv name = catch (getEnv name) error
 --  second arg: filename for preexisting file (which will be moved to doi location)
 --              or value for the 'file' field
 action (Options raw path key) = do
-  dst <- safeGetEnv dstVar
-  bibFile <- getEnvDefault "BIBFILE" $ dst </> defaultBibFileName
+  dst <- safeGetEnv dstEnv
+  bibFile <- getEnvDefault bibFileEnv $ dst </> defaultBibFileEnv
   existingKey bibFile key
   let edoi = extractDoi raw
       url = maybe raw doiUrl edoi
